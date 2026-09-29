@@ -211,7 +211,10 @@ function route() {
     film.srcObject = want;
     film.muted = !!filmStream; // the sharer already hears the tab itself
     if (want) play(film);
+    if (want && !filmStream && !document.fullscreenElement) toast(t('fullHint'), 6000);
   }
+  $('room').classList.toggle('watching', !!want);
+  if (!want) $('room').classList.remove('idle');
   film.volume = +$('volFilm').value;
   $('placeholder').hidden = !!want;
   $('btnPlay').disabled = !want || (!!filmStream && !extension);
@@ -257,6 +260,7 @@ async function startShare() {
   applyText();
   route();
   if (!store.get('blackTipShown', false)) { toast(t('black'), 12000); store.set('blackTipShown', true); }
+  else toast(t('youtubeTip'), 8000);
 }
 
 function stopShare() {
@@ -326,12 +330,27 @@ $('btnLink').onclick = async () => {
   catch { prompt(t('copyLink'), location.href); }
 };
 
-$('btnFull').onclick = () => {
-  const stage = $('stage');
+// Full screen takes the whole room (film, subtitles, webcams and the controls that fade out).
+function toggleFull() {
+  const room = $('room');
   if (document.fullscreenElement) document.exitFullscreen();
-  else if (stage.requestFullscreen) stage.requestFullscreen();
+  else if (room.requestFullscreen) room.requestFullscreen().catch(() => {});
   else $('film').webkitEnterFullscreen?.(); // iPhone: only the video element can go full screen
-};
+}
+$('btnFull').onclick = toggleFull;
+$('stage').ondblclick = e => { if (!e.target.closest('#cams')) toggleFull(); };
+
+// While a film is on, the controls hide after 3 s without moving the mouse or touching.
+let idleTimer = null;
+function wake() {
+  const room = $('room');
+  room.classList.remove('idle');
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    if (room.classList.contains('watching') && !$('settings').open && !room.querySelector('#bar:hover')) room.classList.add('idle');
+  }, 3000);
+}
+for (const ev of ['pointermove', 'pointerdown', 'keydown']) document.addEventListener(ev, wake);
 
 // Floating window (Chrome): webcams and subtitles float above Netflix while you watch there.
 $('btnFloat').onclick = async () => {

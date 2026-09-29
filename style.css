@@ -128,7 +128,25 @@ input:focus { border-color: var(--accent); }
 .vol { display: flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
 .vol input { width: 90px; accent-color: var(--accent); }
 
-#stage:fullscreen #cams { width: clamp(120px, 14vw, 260px); }
+/* watching: the film takes the whole room, controls float over it and fade out */
+#room:fullscreen { background: #000; }
+#room.watching { position: relative; }
+#room.watching #bar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
+  background: linear-gradient(transparent, #000d 45%); border-top: 0; padding-top: 28px;
+  transition: opacity .35s;
+}
+#room.watching:not(.idle) #subs { bottom: calc(7% + 64px); }
+#room.idle { cursor: none; }
+#room.idle #bar, #room.idle #status { opacity: 0; pointer-events: none; }
+#room:fullscreen #cams { width: clamp(120px, 14vw, 260px); }
+
+/* phone turned sideways: all film */
+@media (orientation: landscape) and (max-height: 500px) {
+  #room.watching #cams { width: 90px; top: 8px; right: 8px; }
+  #room.watching #subs { bottom: 4%; }
+  #room.watching #status { display: none; }
+}
 
 dialog {
   background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 18px;
