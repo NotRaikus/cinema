@@ -1,4 +1,10 @@
-// Interface text. The interface speaks the language each person reads subtitles in.
+// Subtitle languages anyone in the room can pick. The extension translates into the ones in use.
+export const LANGS = {
+  it: 'Italiano', th: 'ไทย', en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch',
+  pt: 'Português', ru: 'Русский', ja: '日本語', ko: '한국어', zh: '中文', vi: 'Tiếng Việt',
+};
+
+// Interface text: in the subtitle language when there is a translation, otherwise English.
 export const TEXT = {
   it: {
     title: 'Cinema per due',
@@ -40,6 +46,8 @@ export const TEXT = {
     extMissing: 'Estensione sottotitoli non installata: niente sottotitoli ufficiali da questo PC.',
     headphones: 'Chi condivide il film: meglio con le cuffie, così il microfono non rimanda l\'audio del film.',
     settings: 'Impostazioni',
+    extDownload: "Scarica l'estensione",
+    extDownloadHint: 'Serve solo a chi condivide il film. Estrai lo zip, poi chrome://extensions → Modalità sviluppatore → Carica estensione non pacchettizzata → cartella "estensione".',
   },
   th: {
     title: 'โรงหนังสำหรับสองคน',
@@ -81,5 +89,50 @@ export const TEXT = {
     extMissing: 'ยังไม่ได้ติดตั้งส่วนขยายคำบรรยาย',
     headphones: 'คนที่แชร์หนังควรใส่หูฟัง ไมค์จะได้ไม่ส่งเสียงหนังกลับไป',
     settings: 'ตั้งค่า',
+    extDownload: 'ดาวน์โหลดส่วนขยาย',
+    extDownloadHint: 'ใช้เฉพาะคนที่แชร์หนัง แตกไฟล์ zip แล้วไปที่ chrome://extensions → เปิดโหมดนักพัฒนาซอฟต์แวร์ → โหลดส่วนขยายที่คลายการแพคแล้ว → เลือกโฟลเดอร์ "estensione"',
+  },
+  en: {
+    title: 'Cinema for two',
+    tagline: 'Films, webcams and translated subtitles, wherever you both are',
+    name: 'Your name',
+    lang: 'Subtitles in',
+    enter: 'Enter',
+    newRoom: 'New room',
+    joining: 'Joining the room…',
+    noCam: 'Webcam or microphone not available: you are in to watch only.',
+    waiting: 'Waiting for',
+    waitingSomeone: 'Waiting for the other person…',
+    copyLink: 'Copy link',
+    copied: 'Link copied: send it in the chat',
+    connecting: 'Connecting…',
+    connected: 'Connected',
+    relay: 'via relay',
+    lost: 'Connection lost, retrying…',
+    left: 'left the room',
+    mic: 'Microphone',
+    cam: 'Webcam',
+    share: 'Share film',
+    stopShare: 'Stop',
+    shareHint: 'Pick the Netflix/Disney+/HBO tab and tick "Also share tab audio".',
+    black: 'Black screen? In Chrome: Settings → System → turn off "Use graphics acceleration", then restart Chrome.',
+    noShare: 'From this device you can watch but not share: sharing needs Chrome on a computer.',
+    filmPlaceholder: 'The film appears here when one of you shares it',
+    playPause: 'Play / pause',
+    filmVol: 'Film',
+    voiceVol: 'Voice',
+    fullscreen: 'Full screen',
+    float: 'Floating window',
+    floatHint: 'Webcams and subtitles stay on top of Netflix while you watch.',
+    fullHint: 'Double-click the film for full screen',
+    youtubeTip: 'On YouTube press F in the shared tab: only the video is sent, full size.',
+    subsOrig: 'Also show the original',
+    subsDelay: 'Subtitle delay',
+    ext: 'Subtitle extension connected',
+    extMissing: 'Subtitle extension not installed: no official subtitles from this computer.',
+    headphones: 'Whoever shares the film: better with headphones, so the microphone does not send the film audio back.',
+    settings: 'Settings',
+    extDownload: 'Download the extension',
+    extDownloadHint: 'Only the person sharing the film needs it. Unzip, then chrome://extensions → Developer mode → Load unpacked → the "estensione" folder.',
   },
 };

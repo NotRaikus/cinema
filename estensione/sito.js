@@ -6,8 +6,10 @@ if (location.pathname.includes('cinema')) {
 
   window.addEventListener('message', e => {
     if (e.source !== window || e.data?.source !== 'cinema-page') return;
-    if (e.data.type === 'ping') toPage({ type: 'hello' });
-    if (e.data.type === 'control') chrome.runtime.sendMessage({ type: 'control', action: e.data.action });
+    const { type } = e.data;
+    if (type === 'ping') toPage({ type: 'hello' });
+    if (type === 'control') chrome.runtime.sendMessage({ type, action: e.data.action });
+    if (type === 'langs') chrome.runtime.sendMessage({ type, langs: e.data.langs });
   });
 
   toPage({ type: 'hello' });

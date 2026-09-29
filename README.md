@@ -13,9 +13,12 @@ nella lingua di ciascuno.
   - `js/rtc.js`: collegamento diretto WebRTC tra i due. Film fino a 6 Mbit/s a 30 fps,
     audio del film in stereo a 192 kbit/s, canale dati per sottotitoli e play/pausa.
   - `js/app.js`: stanza, webcam, sottotitoli, finestra mobile.
-- `estensione/`: estensione di Chrome, **solo sul PC di chi condivide il film**.
-  Legge i sottotitoli ufficiali mentre il player li mostra, li traduce in italiano
-  e thai e li passa alla stanza. Nasconde quelli del sito, così non si vedono doppi.
+- `estensione/`: estensione di Chrome, **solo sul PC di chi condivide il film**
+  (può essere l'uno o l'altra: basta che l'abbia chi condivide).
+  Legge i sottotitoli ufficiali mentre il player li mostra, in qualunque lingua,
+  e li traduce nella lingua che ognuno ha scelto nella stanza (italiano, thai,
+  inglese e altre nove). Nasconde quelli del sito, così non si vedono doppi.
+  Si scarica anche dalla stanza: Impostazioni → "Scarica l'estensione".
 
 Perché i sottotitoli ufficiali e non il riconoscimento dell'audio: sono già scritti
 bene e già a tempo col film. Tradurre un testo pulito viene molto meglio che

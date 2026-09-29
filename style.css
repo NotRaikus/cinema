@@ -59,6 +59,12 @@ input:not([type]), input[type=text] {
   padding: 12px 14px; outline: none;
 }
 input:focus { border-color: var(--accent); }
+.langsel {
+  font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 12px; padding: 11px 12px; outline: none;
+}
+.langsel:focus { border-color: var(--accent); }
+dialog a { color: var(--accent-2); font-weight: 700; }
 .seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
 .seg button { background: none; border: 0; border-radius: 9px; padding: 9px; color: var(--muted); font-weight: 600; }
 .seg button.sel { background: var(--accent); color: #fff; }

@@ -1,44 +1,66 @@
-// Receives subtitle lines from the streaming tab, translates them into Italian and Thai,
-// and hands them to every open Cinema per due tab.
+// Receives subtitle lines from the streaming tab, translates them into the languages
+// the room asks for (each person's subtitle language), and hands them to the room tabs.
 
 const ROOM_TABS = ['https://notraikus.github.io/*', 'http://localhost/*', 'http://127.0.0.1/*'];
 const SETTINGS = { engine: 'google', apiKey: '', model: 'claude-opus-5-5', hideOriginal: true };
+const DEFAULT_LANGS = ['it', 'th'];
+const NAMES = {
+  it: 'Italian', th: 'Thai', en: 'English', es: 'Spanish', fr: 'French', de: 'German',
+  pt: 'Portuguese', ru: 'Russian', ja: 'Japanese', ko: 'Korean', zh: 'Simplified Chinese', vi: 'Vietnamese',
+};
 
-const cache = new Map();   // original line -> {it, th}
+const cache = new Map();   // "lang|line" -> translation
 const history = [];        // previous lines, context for Claude
 let newest = 0;
 
 chrome.runtime.onMessage.addListener((msg, sender) => {
-  if (msg.type === 'line') onLine(msg, sender.tab?.id);
+  if (msg.type === 'line') onLine(msg);
   if (msg.type === 'control') toStreamingTabs(msg);
+  if (msg.type === 'langs' && msg.langs?.length) {
+    const langs = msg.langs.filter(l => NAMES[l]);
+    if (langs.length) chrome.storage.session.set({ langs });
+  }
 });
 
-async function onLine({ text, seq }, tabId) {
+async function onLine({ text }) {
   const id = ++newest;
-  chrome.storage.session.set({ lastLine: text, lastSite: tabId ? 'ok' : '' });
-  if (!text) return toRooms({ type: 'sub', seq: id, orig: '', it: '', th: '' });
+  chrome.storage.session.set({ lastLine: text });
+  if (!text) return toRooms({ type: 'sub', seq: id, orig: '', tr: {} });
 
-  const t = await translate(text).catch(e => {
+  const { langs } = await chrome.storage.session.get({ langs: DEFAULT_LANGS });
+  const tr = await translate(text, langs).catch(e => {
     console.warn('translate', e);
-    return { it: '', th: '' };
+    return {};
   });
-  if (id !== newest && !t.fromCache) return; // a newer line arrived meanwhile: skip this one
+  if (id !== newest) return; // a newer line arrived meanwhile: skip this one
   history.push(text);
   if (history.length > 8) history.shift();
-  toRooms({ type: 'sub', seq: id, orig: text, it: t.it || text, th: t.th || text });
+  toRooms({ type: 'sub', seq: id, orig: text, tr });
 }
 
-async function translate(text) {
-  if (cache.has(text)) return { ...cache.get(text), fromCache: true };
-  const s = await chrome.storage.local.get(SETTINGS);
-  let out = null;
-  if (s.engine === 'claude' && s.apiKey) out = await claude(text, s).catch(e => { console.warn('claude', e); return null; });
-  if (!out) {
-    const [it, th] = await Promise.all([google(text, 'it'), google(text, 'th')]);
-    out = { it, th };
+// { lang: translation } for every requested language.
+async function translate(text, langs) {
+  const out = {};
+  const missing = [];
+  for (const l of langs) {
+    const hit = cache.get(`${l}|${text}`);
+    if (hit) out[l] = hit; else missing.push(l);
   }
-  cache.set(text, out);
-  if (cache.size > 2000) cache.delete(cache.keys().next().value);
+  if (!missing.length) return out;
+
+  const s = await chrome.storage.local.get(SETTINGS);
+  let fresh = null;
+  if (s.engine === 'claude' && s.apiKey) fresh = await claude(text, missing, s).catch(e => { console.warn('claude', e); return null; });
+  if (!fresh) {
+    const results = await Promise.all(missing.map(l => google(text, l).catch(() => '')));
+    fresh = Object.fromEntries(missing.map((l, i) => [l, results[i]]));
+  }
+  for (const [l, v] of Object.entries(fresh)) {
+    if (!v) continue;
+    out[l] = v;
+    cache.set(`${l}|${text}`, v);
+  }
+  while (cache.size > 4000) cache.delete(cache.keys().next().value);
   return out;
 }
 
@@ -66,6 +88,7 @@ const blockedUntil = {};
 
 async function google(text, target) {
   const q = encodeURIComponent(text);
+  if (target === 'zh') target = 'zh-CN';
   for (const svc of FREE) {
     if (Date.now() < (blockedUntil[svc.name] || 0)) continue;
     try {
@@ -82,16 +105,17 @@ async function google(text, target) {
 }
 
 // Claude: reads the previous lines too, so pronouns, tone and names come out right.
-const SYSTEM = `You translate film subtitles for an Italian man and a Thai woman who watch films together.
-For each new subtitle line reply with exactly two lines and nothing else:
-IT: <Italian translation>
-TH: <Thai translation>
+const SYSTEM = `You translate film subtitles for people who watch films together, each reading their own language.
+For each new subtitle line reply with exactly one line per requested language code and nothing else, like:
+it: <translation>
+th: <translation>
 Write them like professional subtitles: natural spoken language, short, same meaning and tone.
 Keep character names as they are. Where the original has a line break, write " / ".
-If the line is already in Italian or Thai, copy it unchanged for that language.`;
+If the line is already in a requested language, copy it unchanged for that language.`;
 
-async function claude(text, s) {
+async function claude(text, langs, s) {
   const context = history.length ? `Previous lines, for context only:\n${history.join('\n')}\n\n` : '';
+  const wanted = langs.map(l => `${l} (${NAMES[l]})`).join(', ');
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -105,16 +129,20 @@ async function claude(text, s) {
       max_tokens: 1000,
       output_config: { effort: 'low' },
       system: SYSTEM,
-      messages: [{ role: 'user', content: `${context}Translate this line:\n${text.replace(/\n/g, ' / ')}` }],
+      messages: [{ role: 'user', content: `${context}Languages: ${wanted}\nTranslate this line:\n${text.replace(/\n/g, ' / ')}` }],
     }),
   });
   if (!res.ok) throw new Error(`claude ${res.status}: ${await res.text()}`);
   const data = await res.json();
   if (data.stop_reason === 'refusal') return null;
   const reply = data.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
-  const pick = tag => reply.match(new RegExp(`^${tag}:\\s*(.+)$`, 'm'))?.[1].trim().replace(/\s*\/\s*/g, '\n') || '';
-  const out = { it: pick('IT'), th: pick('TH') };
-  return out.it && out.th ? out : null;
+  const out = {};
+  for (const l of langs) {
+    const m = reply.match(new RegExp(`^${l}:\s*(.+)$`, 'mi'));
+    if (!m) return null; // incomplete answer: let the free translators do it
+    out[l] = m[1].trim().replace(/\s*\/\s*/g, '\n');
+  }
+  return out;
 }
 
 async function toRooms(msg) {

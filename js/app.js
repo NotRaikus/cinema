@@ -1,4 +1,4 @@
-import { TEXT } from './i18n.js';
+import { TEXT, LANGS } from './i18n.js';
 import { openRoom } from './signal.js';
 import { Peer } from './rtc.js';
 
@@ -14,7 +14,7 @@ const store = {
 const me = {
   id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
   name: store.get('name', ''),
-  lang: store.get('lang', navigator.language?.startsWith('th') ? 'th' : 'it'),
+  lang: store.get('lang', LANGS[navigator.language?.slice(0, 2)] ? navigator.language.slice(0, 2) : 'it'),
 };
 const prefs = { showOrig: store.get('showOrig', false), subDelay: store.get('subDelay', 0.3) };
 
@@ -36,15 +36,21 @@ let remoteFilmId = null;
 const remote = new Map(); // stream id -> MediaStream received from the other side
 let extension = false;
 let lastSub = null;
+let remoteLang = null; // the other person's subtitle language, also told over the data channel
 
-const t = key => TEXT[me.lang][key] ?? TEXT.it[key] ?? key;
+const t = key => (TEXT[me.lang] || TEXT.en)[key] ?? TEXT.en[key] ?? key;
+
+for (const sel of [$('langPick'), $('langPick2')]) {
+  for (const [code, label] of Object.entries(LANGS)) sel.add(new Option(label, code));
+  sel.onchange = () => setLang(sel.value);
+}
 
 function applyText() {
   document.documentElement.lang = me.lang;
   document.title = t('title');
   for (const el of document.querySelectorAll('[data-t]')) el.textContent = t(el.dataset.t);
   for (const el of document.querySelectorAll('[data-tip]')) { el.title = t(el.dataset.tip); el.setAttribute('aria-label', t(el.dataset.tip)); }
-  for (const b of document.querySelectorAll('[data-lang]')) b.classList.toggle('sel', b.dataset.lang === me.lang);
+  $('langPick').value = $('langPick2').value = me.lang;
   $('btnShare').querySelector('span').textContent = t(filmStream ? 'stopShare' : 'share');
   $('shareTip').textContent = canShare() ? t('shareHint') : t('noShare');
   $('extState').textContent = t(extension ? 'ext' : 'extMissing');
@@ -67,13 +73,20 @@ function setLang(lang) {
   me.lang = lang;
   store.set('lang', lang);
   signal?.update({ lang });
+  peer?.data({ type: 'lang', lang });
   applyText();
+  tellExtensionLangs();
+}
+
+// The extension of whoever shares translates into the languages the two of us read.
+function tellExtensionLangs() {
+  const langs = [...new Set([me.lang, remoteLang || peerInfo?.lang].filter(Boolean))];
+  toExtension({ type: 'langs', langs });
 }
 
 // ---------- lobby ----------
 
 $('name').value = me.name;
-for (const b of document.querySelectorAll('[data-lang]')) b.onclick = () => setLang(b.dataset.lang);
 $('enter').onclick = join;
 $('name').onkeydown = e => { if (e.key === 'Enter') join(); };
 applyText();
@@ -128,6 +141,7 @@ async function join() {
     if (!peerId) connectToAny();
     peerInfo = peerId ? peers[peerId] || peerInfo : null;
     $('remoteName').textContent = peerInfo?.name || '';
+    tellExtensionLangs();
     showStatus();
   });
   window.addEventListener('pagehide', () => { peer?.data({ type: 'bye' }); signal.leave(); });
@@ -176,7 +190,10 @@ function createPeer() {
     onTrack,
     onData,
     onState: s => {
-      if (s === 'channel') peer.data({ type: 'film', id: filmStream?.id || null });
+      if (s === 'channel') {
+        peer.data({ type: 'film', id: filmStream?.id || null });
+        peer.data({ type: 'lang', lang: me.lang });
+      }
       else connState = s;
       if (s === 'disconnected' || s === 'failed') stats = null;
       if (s === 'failed') setTimeout(recover, 1000);
@@ -204,7 +221,7 @@ function closePeer() {
 
 function dropPeer() {
   closePeer();
-  peerId = peerInfo = null;
+  peerId = peerInfo = remoteLang = null;
   session = 0;
   route();
   showStatus();
@@ -271,6 +288,7 @@ function onTrack(track, stream) {
 function onData(msg) {
   if (msg.type === 'film') { remoteFilmId = msg.id; route(); }
   else if (msg.type === 'bye') dropPeer();
+  else if (msg.type === 'lang') { remoteLang = msg.lang; tellExtensionLangs(); }
   else if (msg.type === 'sub') showSub(msg, true);
   else if (msg.type === 'control' && filmStream) toExtension({ type: 'control', action: msg.action });
 }
@@ -362,10 +380,11 @@ function toExtension(msg) { window.postMessage({ source: 'cinema-page', ...msg }
 window.addEventListener('message', e => {
   if (e.source !== window || e.data?.source !== 'cinema-ext') return;
   const msg = e.data;
-  if (msg.type === 'hello') { extension = true; applyText(); route(); }
+  if (msg.type === 'hello') { extension = true; applyText(); route(); tellExtensionLangs(); }
   if (msg.type === 'sub') {
-    showSub(msg, false);
-    peer?.data({ type: 'sub', seq: msg.seq, orig: msg.orig, it: msg.it, th: msg.th });
+    const sub = { type: 'sub', seq: msg.seq, orig: msg.orig, tr: msg.tr || {} };
+    showSub(sub, false);
+    peer?.data(sub);
   }
 });
 toExtension({ type: 'ping' });
@@ -377,7 +396,7 @@ function showSub(sub, fromRemote) {
 }
 
 function renderSub(sub) {
-  const main = sub[me.lang] || sub.orig || '';
+  const main = sub.tr?.[me.lang] || sub.orig || '';
   const orig = prefs.showOrig && sub.orig && sub.orig !== main ? sub.orig : '';
   const box = $('subs');
   box.querySelector('.main').textContent = main;

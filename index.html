@@ -32,10 +32,7 @@
     <label><span data-t="name"></span><input id="name" maxlength="20" autocomplete="nickname"></label>
     <div class="field">
       <span data-t="lang"></span>
-      <div class="seg" id="langPick">
-        <button type="button" data-lang="it">Italiano</button>
-        <button type="button" data-lang="th">ไทย</button>
-      </div>
+      <select class="langsel" id="langPick"></select>
     </div>
     <button id="enter" class="primary" data-t="enter"></button>
     <p class="small" id="lobbyNote"></p>
@@ -72,14 +69,12 @@
     <form method="dialog">
       <div class="field">
         <span data-t="lang"></span>
-        <div class="seg" id="langPick2">
-          <button type="button" data-lang="it">Italiano</button>
-          <button type="button" data-lang="th">ไทย</button>
-        </div>
+        <select class="langsel" id="langPick2"></select>
       </div>
       <label class="check"><input type="checkbox" id="showOrig"><span data-t="subsOrig"></span></label>
       <label><span><span data-t="subsDelay"></span>: <b id="delayVal"></b></span><input id="subDelay" type="range" min="0" max="2" step="0.1"></label>
       <p class="small" id="extState"></p>
+      <p class="small"><a id="extLink" href="https://github.com/NotRaikus/cinema/archive/refs/heads/main.zip" data-t="extDownload"></a> — <span data-t="extDownloadHint"></span></p>
       <p class="small" data-t="headphones"></p>
       <p class="small" data-t="black"></p>
       <button class="primary">OK</button>
