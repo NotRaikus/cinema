@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cinema per due</title>
+<meta name="theme-color" content="#0d0b12">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600&family=Nunito+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23ff5f7e'/><path d='M12 9l12 7-12 7z' fill='white'/></svg>">
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12z"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path d="M15 8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2.5l5 3.5V7l-5 3.5z"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6v2h3v2H8v-2h3v-2H5a2 2 0 0 1-2-2zm9 2-4 4h3v3h2v-3h3z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 5v14l6-7zm7 0h3v14h-3z"/></symbol>
+  <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z"/></symbol>
+  <symbol id="i-float" viewBox="0 0 24 24"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zm2 0v14h14V5zm6 7h7v5h-7z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10.6 13.4a1 1 0 0 0 1.4 0l4-4a3 3 0 0 0-4.2-4.2l-1.5 1.5 1.4 1.4 1.5-1.5a1 1 0 0 1 1.4 1.4l-4 4a1 1 0 0 0 0 1.4zm2.8-2.8a1 1 0 0 0-1.4 0l-4 4a3 3 0 0 0 4.2 4.2l1.5-1.5-1.4-1.4-1.5 1.5a1 1 0 0 1-1.4-1.4l4-4a1 1 0 0 0 0-1.4z"/></symbol>
+</svg>
+
+<section id="lobby">
+  <div class="card">
+    <div class="logo"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="9"/><path d="M12 9l12 7-12 7z"/></svg></div>
+    <h1 data-t="title"></h1>
+    <p class="tagline" data-t="tagline"></p>
+    <label><span data-t="name"></span><input id="name" maxlength="20" autocomplete="nickname"></label>
+    <div class="field">
+      <span data-t="lang"></span>
+      <div class="seg" id="langPick">
+        <button type="button" data-lang="it">Italiano</button>
+        <button type="button" data-lang="th">ไทย</button>
+      </div>
+    </div>
+    <button id="enter" class="primary" data-t="enter"></button>
+    <p class="small" id="lobbyNote"></p>
+  </div>
+</section>
+
+<main id="room" hidden>
+  <div id="stage">
+    <video id="film" playsinline autoplay></video>
+    <div id="placeholder"><p data-t="filmPlaceholder"></p><p class="small" id="shareTip"></p></div>
+    <div id="subs" aria-live="polite"><div class="orig"></div><div class="main"></div></div>
+    <div id="cams">
+      <figure id="remoteBox" hidden><video id="camRemote" playsinline autoplay></video><figcaption id="remoteName"></figcaption></figure>
+      <figure id="localBox"><video id="camLocal" playsinline autoplay muted></video></figure>
+    </div>
+    <div id="status"><span class="dot"></span><span id="statusText"></span></div>
+  </div>
+
+  <nav id="bar">
+    <button id="btnMic" class="round on" data-tip="mic"><svg><use href="#i-mic"/></svg></button>
+    <button id="btnCam" class="round on" data-tip="cam"><svg><use href="#i-cam"/></svg></button>
+    <button id="btnShare" class="pill"><svg><use href="#i-share"/></svg><span data-t="share"></span></button>
+    <button id="btnPlay" class="round" data-tip="playPause" disabled><svg><use href="#i-play"/></svg></button>
+    <label class="vol"><span data-t="filmVol"></span><input id="volFilm" type="range" min="0" max="1" step="0.05" value="1"></label>
+    <label class="vol"><span data-t="voiceVol"></span><input id="volVoice" type="range" min="0" max="1" step="0.05" value="1"></label>
+    <span class="grow"></span>
+    <button id="btnLink" class="round" data-tip="copyLink"><svg><use href="#i-link"/></svg></button>
+    <button id="btnFloat" class="round" data-tip="float" hidden><svg><use href="#i-float"/></svg></button>
+    <button id="btnFull" class="round" data-tip="fullscreen"><svg><use href="#i-full"/></svg></button>
+    <button id="btnSettings" class="round" data-tip="settings"><svg><use href="#i-gear"/></svg></button>
+  </nav>
+
+  <dialog id="settings">
+    <form method="dialog">
+      <div class="field">
+        <span data-t="lang"></span>
+        <div class="seg" id="langPick2">
+          <button type="button" data-lang="it">Italiano</button>
+          <button type="button" data-lang="th">ไทย</button>
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" id="showOrig"><span data-t="subsOrig"></span></label>
+      <label><span><span data-t="subsDelay"></span>: <b id="delayVal"></b></span><input id="subDelay" type="range" min="0" max="2" step="0.1"></label>
+      <p class="small" id="extState"></p>
+      <p class="small" data-t="headphones"></p>
+      <p class="small" data-t="black"></p>
+      <button class="primary">OK</button>
+    </form>
+  </dialog>
+</main>
+
+<div id="toast" role="status"></div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<style>
+  body { width: 320px; margin: 0; padding: 16px; font: 14px/1.4 system-ui, sans-serif; background: #1a1622; color: #f4f0f8; display: grid; gap: 12px; }
+  h1 { font-size: 16px; margin: 0; }
+  label { display: grid; gap: 4px; color: #a99fb8; font-size: 12px; }
+  select, input[type=password], input[type=text] { font: inherit; background: #262031; color: #f4f0f8; border: 1px solid #3a3147; border-radius: 8px; padding: 7px 9px; }
+  .check { display: flex; gap: 8px; align-items: center; color: #f4f0f8; font-size: 13px; }
+  .note { color: #a99fb8; font-size: 12px; margin: 0; }
+  #last { background: #000; border-radius: 8px; padding: 8px; min-height: 20px; white-space: pre-line; font-size: 13px; }
+  #claudeBox[hidden] { display: none; }
+</style>
+</head>
+<body>
+  <h1>Cinema per due — sottotitoli</h1>
+  <label>Traduzione
+    <select id="engine">
+      <option value="google">Google Traduttore (gratis, con riserve)</option>
+      <option value="claude">Claude (migliore, serve chiave API)</option>
+    </select>
+  </label>
+  <div id="claudeBox">
+    <label>Chiave API Anthropic <input id="apiKey" type="password" placeholder="sk-ant-..."></label>
+    <label>Modello <input id="model" type="text"></label>
+    <p class="note">claude-opus-5-5 traduce meglio; claude-haiku-4-5 è più rapido ed economico. Se Claude non risponde si usa Google.</p>
+  </div>
+  <label class="check"><input id="hideOriginal" type="checkbox"> Nascondi i sottotitoli del sito (li vedi solo nella stanza)</label>
+  <label>Ultima riga letta <div id="last">—</div></label>
+  <p class="note">Nel player attiva i sottotitoli (inglese o lingua del film). Se Netflix ha già quelli in thai o in italiano, il testo arriva identico, senza traduzione sbagliata.</p>
+  <script src="popup.js"></script>
+</body>
+</html>

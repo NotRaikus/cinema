@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Cinema per due — sottotitoli",
+  "version": "1.0.0",
+  "description": "Legge i sottotitoli ufficiali di Netflix, Disney+, HBO Max, Prime Video e YouTube, li traduce in italiano e thai e li passa a Cinema per due.",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": [
+    "https://clients5.google.com/*",
+    "https://translate.googleapis.com/*",
+    "https://api.mymemory.translated.net/*",
+    "https://api.anthropic.com/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "Sottotitoli" },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.netflix.com/*",
+        "https://www.disneyplus.com/*",
+        "https://*.max.com/*",
+        "https://*.hbomax.com/*",
+        "https://www.primevideo.com/*",
+        "https://www.amazon.com/*",
+        "https://www.amazon.it/*",
+        "https://www.youtube.com/*"
+      ],
+      "js": ["streaming.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://notraikus.github.io/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": ["sito.js"],
+      "run_at": "document_start"
+    }
+  ]
+}
