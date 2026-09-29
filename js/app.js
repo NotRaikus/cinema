@@ -283,7 +283,7 @@ window.addEventListener('message', e => {
   if (e.source !== window || e.data?.source !== 'cinema-ext') return;
   const msg = e.data;
   if (msg.type === 'hello') { extension = true; applyText(); route(); }
-  if (msg.type === 'sub' && filmStream) {
+  if (msg.type === 'sub') {
     showSub(msg, false);
     peer?.data({ type: 'sub', seq: msg.seq, orig: msg.orig, it: msg.it, th: msg.th });
   }
