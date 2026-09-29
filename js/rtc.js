@@ -34,10 +34,7 @@ export class Peer {
     };
     pc.onicecandidate = ({ candidate }) => { if (candidate) send({ candidate: candidate.toJSON() }); };
     pc.ontrack = e => onTrack(e.track, e.streams[0]);
-    pc.onconnectionstatechange = () => {
-      onState(pc.connectionState);
-      if (pc.connectionState === 'failed') pc.restartIce();
-    };
+    pc.onconnectionstatechange = () => onState(pc.connectionState);
 
     // Both sides open channel 0 themselves: nobody has to "create" it first.
     this.channel = pc.createDataChannel('dati', { negotiated: true, id: 0 });

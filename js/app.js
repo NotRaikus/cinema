@@ -107,58 +107,133 @@ async function join() {
   $('btnShare').hidden = !canShare();
   $('btnFloat').hidden = !('documentPictureInPicture' in window);
 
-  signal.onMessage((from, data) => ensurePeer(from)?.receive(data));
+  signal.onMessage(onSignal);
   signal.onPeers(peers => {
+    lastPeers = peers;
+    // Someone missing from the list may just have had a hiccup: give them a few seconds.
     if (peerId && !peers[peerId]) {
-      toast(`${peerInfo?.name || ''} ${t('left')}`);
-      dropPeer();
+      absentTimer ??= setTimeout(() => {
+        absentTimer = null;
+        // Still watching together? Then it was only the switchboard: carry on.
+        if (peerId && !lastPeers[peerId] && connState !== 'connected') {
+          toast(`${peerInfo?.name || ''} ${t('left')}`);
+          dropPeer();
+          connectToAny();
+        }
+      }, 8000);
+    } else {
+      clearTimeout(absentTimer);
+      absentTimer = null;
     }
-    if (!peerId) {
-      const first = Object.keys(peers)[0];
-      if (first) ensurePeer(first);
-    }
-    peerInfo = peerId ? peers[peerId] : null;
+    if (!peerId) connectToAny();
+    peerInfo = peerId ? peers[peerId] || peerInfo : null;
     $('remoteName').textContent = peerInfo?.name || '';
     showStatus();
   });
-  window.addEventListener('pagehide', () => signal.leave());
+  window.addEventListener('pagehide', () => { peer?.data({ type: 'bye' }); signal.leave(); });
   showStatus();
   setInterval(updateStats, 3000);
 }
 
 // ---------- connection ----------
+// The two sides must always agree on which connection is the current one, even after a
+// network hiccup or a reload. So one side (the "leader": the smaller id) owns the session:
+// only the leader opens a new one, the other side follows. Every signaling message carries
+// the session number, and leftovers from an older session are ignored.
 
 let connState = 'new';
 let stats = null;
+let lastPeers = {};
+let absentTimer = null;
+let session = 0;
+let sessionStart = 0;
 
-function ensurePeer(id) {
-  if (peer) return peerId === id ? peer : null; // the room is for two
+const leaderIsMe = other => me.id < other;
+
+function connectToAny() {
+  const id = Object.keys(lastPeers)[0];
+  if (!id) return;
   peerId = id;
+  peerInfo = lastPeers[id];
+  if (leaderIsMe(id)) newSession();
+  else signal.send(id, { hello: true }); // ask the leader for a session
+}
+
+function newSession() {
+  closePeer();
+  session = Date.now();
+  sessionStart = Date.now();
+  createPeer();
+}
+
+function createPeer() {
+  const id = peerId, sess = session;
   peer = new Peer({
-    send: data => signal.send(id, data),
-    polite: me.id > id,
+    // The film id rides along with every message: the other side always knows which
+    // incoming video is the film and which is the webcam.
+    send: data => signal.send(id, { ...data, sess, film: filmStream?.id || null }),
+    polite: !leaderIsMe(id),
     onTrack,
     onData,
     onState: s => {
       if (s === 'channel') peer.data({ type: 'film', id: filmStream?.id || null });
       else connState = s;
       if (s === 'disconnected' || s === 'failed') stats = null;
+      if (s === 'failed') setTimeout(recover, 1000);
       showStatus();
     },
   });
   peer.setStream('cam', camStream);
   if (filmStream) peer.setStream('film', filmStream);
-  return peer;
 }
 
-function dropPeer() {
+function recover() {
+  if (!peerId || connState !== 'failed') return;
+  if (leaderIsMe(peerId)) newSession();
+  else signal.send(peerId, { hello: true });
+}
+
+function closePeer() {
   peer?.close();
-  peer = peerId = peerInfo = null;
+  peer = null;
   remote.clear();
   remoteFilmId = null;
   connState = 'new';
   stats = null;
+}
+
+function dropPeer() {
+  closePeer();
+  peerId = peerInfo = null;
+  session = 0;
   route();
+  showStatus();
+}
+
+async function onSignal(from, data) {
+  if (from !== peerId) {
+    // A new arrival (the other person reloaded, or came back): the room is for two, they take the place.
+    const fromLeader = data.sess && !leaderIsMe(from);
+    if (!data.hello && !fromLeader) return;
+    dropPeer();
+    peerId = from;
+    peerInfo = lastPeers[from] || null;
+  }
+  if (leaderIsMe(from)) {
+    if (data.hello) {
+      // The follower lost its connection (or just arrived): open a fresh one,
+      // unless the current one was opened a moment ago and is still on its way.
+      if (!peer || Date.now() - sessionStart > 5000) newSession();
+      return;
+    }
+    if (data.sess !== session) return; // leftover from an old session
+  } else {
+    if (!data.sess || data.sess < session) return;
+    if (data.sess > session) { closePeer(); session = data.sess; createPeer(); }
+  }
+  if ('film' in data && data.film !== remoteFilmId) { remoteFilmId = data.film; route(); }
+  try { await peer.receive(data); } catch (e) { console.warn('signal', e); }
+  showStatus();
 }
 
 function showStatus() {
@@ -195,6 +270,7 @@ function onTrack(track, stream) {
 
 function onData(msg) {
   if (msg.type === 'film') { remoteFilmId = msg.id; route(); }
+  else if (msg.type === 'bye') dropPeer();
   else if (msg.type === 'sub') showSub(msg, true);
   else if (msg.type === 'control' && filmStream) toExtension({ type: 'control', action: msg.action });
 }
