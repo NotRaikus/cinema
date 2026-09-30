@@ -59,6 +59,22 @@ input:not([type]), input[type=text] {
   padding: 12px 14px; outline: none;
 }
 input:focus { border-color: var(--accent); }
+.roombox { display: grid; gap: 6px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+.roombox b { font-size: 16px; }
+.linkrow { display: flex; gap: 8px; align-items: center; }
+.linkrow input { flex: 1; min-width: 0; font: 13px/1.2 ui-monospace, monospace; color: var(--accent-2); background: #0006; border: 0; border-radius: 8px; padding: 9px 10px; outline: none; }
+.linkrow .round svg { width: 18px; height: 18px; fill: currentColor; }
+.handle { display: flex; align-items: center; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding-left: 12px; }
+.handle:focus-within { border-color: var(--accent); }
+.handle span { color: var(--muted); font-weight: 800; }
+.handle input { flex: 1; min-width: 0; font: inherit; color: var(--text); background: none; border: 0; outline: none; padding: 12px 12px 12px 4px; }
+#handleState.ok { color: var(--ok); }
+#handleState.bad { color: var(--bad); }
+.goform { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; align-items: center; border-top: 1px solid var(--line); padding-top: 14px; font-size: 13px; color: var(--muted); }
+.goform > span { grid-column: 1 / -1; }
+.goform .round { font-size: 18px; }
+#newProfile { display: grid; gap: 6px; }
+#newProfile p { margin: 0; }
 .langsel {
   font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line);
   border-radius: 12px; padding: 11px 12px; outline: none;
@@ -99,13 +115,27 @@ dialog a { color: var(--accent-2); font-weight: 700; }
 #subs .orig { font-size: calc(var(--sub-size) * .6); color: #ddd; }
 #subs .main:lang(th), :lang(th) #subs .main { line-height: 1.5; }
 
-#cams { position: absolute; top: 12px; right: 12px; display: grid; gap: 8px; width: clamp(120px, 17vw, 240px); }
-#cams figure { position: relative; margin: 0; border-radius: 14px; overflow: hidden; background: var(--panel); aspect-ratio: 4 / 3; box-shadow: 0 8px 24px #0009; border: 1px solid #ffffff1a; }
-#cams video { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* webcams float over the film: drag them anywhere, resize from the corner or with the wheel */
+#cams { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+#cams figure {
+  position: absolute; margin: 0; pointer-events: auto; cursor: grab; touch-action: none; user-select: none;
+  border-radius: 14px; overflow: hidden; background: var(--panel); aspect-ratio: 4 / 3;
+  box-shadow: 0 8px 24px #0009; border: 1px solid #ffffff1a;
+}
+#cams figure.moving { cursor: grabbing; outline: 2px solid var(--accent); }
+#cams video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
 #localBox video { transform: scaleX(-1); }
-#localBox { width: 60%; justify-self: end; }
 #localBox.muted video { visibility: hidden; }
-#cams figcaption { position: absolute; left: 8px; bottom: 6px; font-size: 12px; font-weight: 700; text-shadow: 0 1px 3px #000; }
+#cams figcaption { position: absolute; left: 8px; bottom: 6px; font-size: 12px; font-weight: 700; text-shadow: 0 1px 3px #000; pointer-events: none; }
+#cams .grip {
+  position: absolute; right: 0; bottom: 0; width: 24px; height: 24px; cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 55%, #fffc 55%, #fffc 62%, transparent 62%, transparent 72%, #fffc 72%, #fffc 79%, transparent 79%);
+  opacity: 0; transition: opacity .2s;
+}
+#cams figure:hover .grip, #cams figure.moving .grip { opacity: 1; }
+@media (hover: none) { #cams .grip { opacity: .7; } }
+#room.idle #cams .grip { opacity: 0; }
+#subs { z-index: 4; }
 
 #status {
   position: absolute; top: 12px; left: 12px; display: flex; align-items: center; gap: 8px;
@@ -145,11 +175,9 @@ dialog a { color: var(--accent-2); font-weight: 700; }
 #room.watching:not(.idle) #subs { bottom: calc(7% + 64px); }
 #room.idle { cursor: none; }
 #room.idle #bar, #room.idle #status { opacity: 0; pointer-events: none; }
-#room:fullscreen #cams { width: clamp(120px, 14vw, 260px); }
 
 /* phone turned sideways: all film */
 @media (orientation: landscape) and (max-height: 500px) {
-  #room.watching #cams { width: 90px; top: 8px; right: 8px; }
   #room.watching #subs { bottom: 4%; }
   #room.watching #status { display: none; }
 }
@@ -180,14 +208,13 @@ dialog input[type=range] { accent-color: var(--accent); }
   #bar .grow { display: none; }
   .pill span { display: none; }
   .pill { width: 44px; padding: 0; }
-  #cams { width: 110px; top: 50px; }
 }
 
 /* floating window (Document Picture-in-Picture) */
 body.pip { background: #000; display: flex; flex-direction: column; overflow: hidden; }
-body.pip #cams { position: static; width: 100%; flex: 1; min-height: 0; grid-template-columns: 1fr; grid-auto-rows: 1fr; gap: 4px; padding: 4px; }
-body.pip #cams figure { aspect-ratio: auto; }
-body.pip #localBox { position: absolute; right: 10px; top: 10px; width: 30%; height: auto; aspect-ratio: 4 / 3; z-index: 2; }
+body.pip #cams { position: relative; inset: auto; width: 100%; flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr; grid-auto-rows: 1fr; gap: 4px; padding: 4px; pointer-events: auto; }
+body.pip #cams figure { position: relative !important; left: auto !important; top: auto !important; width: auto !important; aspect-ratio: auto; cursor: default; }
+body.pip #cams .grip { display: none; }
 body.pip #subs { position: static; transform: none; width: 100%; padding: 6px; background: #000; min-height: 64px; }
 body.pip #subs .main { font-size: 20px; }
 body.pip #subs .orig { font-size: 13px; }

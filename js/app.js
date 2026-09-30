@@ -1,5 +1,5 @@
 import { TEXT, LANGS } from './i18n.js';
-import { openRoom } from './signal.js';
+import { openRoom, lookupHandle, claimHandle, HANDLE } from './signal.js';
 import { Peer } from './rtc.js';
 
 // Cached: some elements move into the floating window and must still be found.
@@ -11,22 +11,27 @@ const store = {
   set(k, v) { try { localStorage.setItem('cinema.' + k, JSON.stringify(v)); } catch { /* private mode */ } },
 };
 
+// Profile kept in this browser: nickname (the fixed link of one's own room), name, and the
+// secret that proves the nickname is ours.
+let profile = store.get('profile', null); // { handle, name, secret }
+
 const me = {
   id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
-  name: store.get('name', ''),
+  handle: profile?.handle || '',
+  name: profile?.name || '',
   lang: store.get('lang', LANGS[navigator.language?.slice(0, 2)] ? navigator.language.slice(0, 2) : 'it'),
 };
 const prefs = { showOrig: store.get('showOrig', false), subDelay: store.get('subDelay', 0.3) };
 
-// The room code travels in the link: ?stanza=xxxxxxxxxx
-const params = new URLSearchParams(location.search);
-let code = params.get('stanza');
-if (!code || code.length < 10) {
-  const abc = 'abcdefghjkmnpqrstuvwxyz23456789';
-  code = Array.from(crypto.getRandomValues(new Uint8Array(10)), b => abc[b % abc.length]).join('');
-  params.set('stanza', code);
-  history.replaceState(null, '', `${location.pathname}?${params}`);
-}
+// Whose room: ?@nickname is that person's own room, always the same link.
+// ?stanza=<code> still opens the old one-off rooms.
+const query = decodeURIComponent(location.search.slice(1)).split('&')[0];
+let roomHandle = query.startsWith('@') ? query.slice(1).toLowerCase() : null;
+if (roomHandle && !HANDLE.test(roomHandle)) roomHandle = null;
+const oldCode = new URLSearchParams(location.search).get('stanza');
+if (!roomHandle && !oldCode && profile) roomHandle = profile.handle;
+const roomLink = h => `${location.origin}${location.pathname}?@${h}`;
+let code = null; // Firebase room, decided on entering
 
 let signal = null;
 let peer = null, peerId = null, peerInfo = null;
@@ -56,6 +61,7 @@ function applyText() {
   $('extState').textContent = t(extension ? 'ext' : 'extMissing');
   $('delayVal').textContent = `${prefs.subDelay.toFixed(1)} s`;
   showStatus();
+  showLobby();
   if (lastSub) renderSub(lastSub);
 }
 
@@ -86,14 +92,94 @@ function tellExtensionLangs() {
 
 // ---------- lobby ----------
 
+function showLobby() {
+  if (!$('lobby') || $('lobby').hidden) return;
+  $('newProfile').hidden = !!profile;
+  $('goForm').hidden = !profile;
+  // Before the profile exists, the room shown is the one the typed nickname will get.
+  const target = roomHandle || (!profile && !oldCode && HANDLE.test($('handle').value) ? $('handle').value : null);
+  $('roomBox').hidden = !target;
+  if (target) {
+    $('roomTitle').textContent = !profile && !roomHandle || target === me.handle ? t('yourRoom') : `${t('roomOf')} @${target}`;
+    $('roomLink').value = roomLink(target);
+  }
+  $('enter').textContent = t(profile ? 'enter' : 'create');
+}
+
+const note = text => { $('lobbyNote').textContent = text; };
+
 $('name').value = me.name;
-$('enter').onclick = join;
-$('name').onkeydown = e => { if (e.key === 'Enter') join(); };
+$('enter').onclick = enter;
+$('name').onkeydown = e => { if (e.key === 'Enter') enter(); };
+$('copyRoom').onclick = async () => {
+  try { await navigator.clipboard.writeText($('roomLink').value); toast(t('copied')); } catch { $('roomLink').select(); }
+};
+$('goForm').onsubmit = e => {
+  e.preventDefault();
+  const h = $('goHandle').value.trim().replace(/^@/, '').toLowerCase();
+  if (HANDLE.test(h)) location.search = `?@${h}`;
+};
+
+// Nickname: lowercase letters, digits and _; checked against Firebase while typing.
+let handleTimer = null;
+$('handle').oninput = () => {
+  const el = $('handle');
+  el.value = el.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+  $('handleState').textContent = '';
+  showLobby();
+  clearTimeout(handleTimer);
+  if (!HANDLE.test(el.value)) return;
+  const h = el.value;
+  handleTimer = setTimeout(async () => {
+    const taken = await lookupHandle(h).catch(() => null);
+    if ($('handle').value !== h) return;
+    $('handleState').textContent = taken ? `✗ ${t('handleTaken')}` : `✓ ${t('handleFree')}`;
+    $('handleState').className = taken ? 'bad' : 'ok';
+  }, 350);
+};
 applyText();
 
+async function enter() {
+  note('');
+  $('enter').disabled = true;
+  try {
+    if (!profile) {
+      const handle = $('handle').value;
+      if (!HANDLE.test(handle)) { note(t('handleHint')); return; }
+      const name = $('name').value.trim() || handle;
+      const secret = crypto.randomUUID();
+      if (!await claimHandle(handle, { name, lang: me.lang, secret })) { note(t('handleTaken')); return; }
+      profile = { handle, name, secret };
+      store.set('profile', profile);
+    } else {
+      const name = $('name').value.trim() || profile.handle;
+      if (name !== profile.name) {
+        profile.name = name;
+        store.set('profile', profile);
+        claimHandle(profile.handle, { name, lang: me.lang, secret: profile.secret }).catch(() => {});
+      }
+    }
+    me.handle = profile.handle;
+    me.name = profile.name;
+    if (!roomHandle && !oldCode) roomHandle = me.handle;
+    if (roomHandle && roomHandle !== me.handle && !await lookupHandle(roomHandle)) {
+      note(`@${roomHandle}: ${t('noSuchUser')}`);
+      return;
+    }
+    code = roomHandle ? `room-${roomHandle}` : oldCode;
+    if (roomHandle) history.replaceState(null, '', `${location.pathname}?@${roomHandle}`);
+  } catch (e) {
+    console.error(e);
+    note(String(e.message || e));
+    return;
+  } finally {
+    $('enter').disabled = false;
+  }
+  join();
+}
+
 async function join() {
-  me.name = $('name').value.trim() || (me.lang === 'th' ? 'เธอ' : 'Io');
-  store.set('name', me.name);
+  $('localName').textContent = t('you');
   $('enter').disabled = true;
   $('lobbyNote').textContent = t('joining');
 
@@ -119,6 +205,8 @@ async function join() {
   $('room').hidden = false;
   $('btnShare').hidden = !canShare();
   $('btnFloat').hidden = !('documentPictureInPicture' in window);
+  placeCams();
+  if (!store.get('camHintShown', false)) { toast(t('camHint'), 7000); store.set('camHintShown', true); }
 
   signal.onMessage(onSignal);
   signal.onPeers(peers => {
@@ -265,6 +353,7 @@ function showStatus() {
     cls = 'ok';
   } else if (connState === 'disconnected' || connState === 'failed') { text = t('lost'); cls = 'bad'; }
   else { text = `${t('connecting')} ${peerInfo?.name || ''}`; cls = 'wait'; }
+  if (roomHandle) text = `@${roomHandle} · ${text}`;
   $('statusText').textContent = text;
   el.className = cls;
 }
@@ -404,6 +493,77 @@ function renderSub(sub) {
   box.classList.toggle('empty', !main);
 }
 
+// ---------- webcams: drag them anywhere, resize from the corner or with the wheel ----------
+// Position and size are fractions of the film area, so they survive full screen and resizes.
+
+const CAM_DEFAULTS = { remoteBox: { x: 0.76, y: 0.05, w: 0.22 }, localBox: { x: 0.84, y: 0.38, w: 0.14 } };
+const camFigures = () => [$('remoteBox'), $('localBox')];
+
+function placeCam(fig) {
+  if (fig.ownerDocument !== document) return; // in the floating window the layout is fixed
+  const r = $('stage').getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  const p = fig.pos;
+  p.w = Math.min(Math.max(p.w, 0.07), 0.7);
+  const h = (p.w * r.width * 0.75) / r.height;
+  p.x = Math.min(Math.max(p.x, 0), 1 - p.w);
+  p.y = Math.min(Math.max(p.y, 0), Math.max(0, 1 - h));
+  fig.style.left = `${p.x * 100}%`;
+  fig.style.top = `${p.y * 100}%`;
+  fig.style.width = `${p.w * 100}%`;
+}
+
+for (const fig of camFigures()) {
+  fig.pos = { ...CAM_DEFAULTS[fig.id], ...store.get(`cam.${fig.id}`, {}) };
+  const save = () => store.set(`cam.${fig.id}`, fig.pos);
+
+  fig.addEventListener('pointerdown', e => {
+    if (fig.ownerDocument !== document || e.button > 0) return;
+    e.preventDefault();
+    const resizing = e.target.classList.contains('grip');
+    const r = $('stage').getBoundingClientRect();
+    const pointer = { x: e.clientX, y: e.clientY };
+    const from = { ...fig.pos };
+    fig.setPointerCapture(e.pointerId);
+    fig.classList.add('moving');
+    fig.style.zIndex = ++placeCam.top;
+    const move = ev => {
+      const dx = (ev.clientX - pointer.x) / r.width;
+      const dy = (ev.clientY - pointer.y) / r.height;
+      if (resizing) fig.pos.w = from.w + dx;
+      else { fig.pos.x = from.x + dx; fig.pos.y = from.y + dy; }
+      placeCam(fig);
+    };
+    const up = () => {
+      fig.removeEventListener('pointermove', move);
+      fig.removeEventListener('pointerup', up);
+      fig.removeEventListener('pointercancel', up);
+      fig.classList.remove('moving');
+      save();
+    };
+    fig.addEventListener('pointermove', move);
+    fig.addEventListener('pointerup', up);
+    fig.addEventListener('pointercancel', up);
+  });
+
+  // Wheel zooms around the centre of the webcam.
+  fig.addEventListener('wheel', e => {
+    if (fig.ownerDocument !== document) return;
+    e.preventDefault();
+    const r = $('stage').getBoundingClientRect();
+    const old = fig.pos.w;
+    fig.pos.w = old * (e.deltaY < 0 ? 1.1 : 0.9);
+    const grow = Math.min(Math.max(fig.pos.w, 0.07), 0.7) - old;
+    fig.pos.x -= grow / 2;
+    fig.pos.y -= (grow * r.width * 0.75) / r.height / 2;
+    placeCam(fig);
+    save();
+  }, { passive: false });
+}
+placeCam.top = 3;
+const placeCams = () => camFigures().forEach(placeCam);
+new ResizeObserver(placeCams).observe($('stage'));
+
 // ---------- controls ----------
 
 function toggleTrack(kind, btn) {
@@ -469,6 +629,7 @@ $('btnFloat').onclick = async () => {
   toast(t('floatHint'));
   pip.addEventListener('pagehide', () => {
     $('stage').append($('subs'), $('cams'));
+    placeCams();
     for (const v of $('stage').querySelectorAll('video')) v.play().catch(() => {});
   });
 };

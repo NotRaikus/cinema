@@ -24,6 +24,19 @@ Perché i sottotitoli ufficiali e non il riconoscimento dell'audio: sono già sc
 bene e già a tempo col film. Tradurre un testo pulito viene molto meglio che
 trascrivere l'audio e poi tradurlo.
 
+## Profili e stanze fisse
+
+La prima volta ognuno sceglie un nickname (lettere minuscole, numeri e `_`) e ha una
+stanza sua con un link che non cambia mai: `https://notraikus.github.io/cinema/?@raikus`.
+Aprendo il sito senza link si finisce nella propria stanza; dalla schermata d'ingresso
+si può andare nella stanza di un altro nickname. I profili stanno in Firebase sotto
+`homes/cinema-users/<nickname>`, le stanze sotto `homes/cinema-room-<nickname>`.
+Il profilo è legato al browser in cui è stato creato (un segreto in localStorage, di cui
+Firebase conserva solo l'impronta SHA-256): su un altro PC si crea un profilo nuovo.
+
+Le webcam si trascinano dove si vuole sopra il film e si ingrandiscono tirando l'angolo
+in basso a destra o con la rotella; la posizione resta salvata.
+
 ## Serata film, passo per passo
 
 Chi condivide (PC con Chrome):
