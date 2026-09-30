@@ -19,6 +19,9 @@ async function connect() {
   return conn;
 }
 
+// Start loading Firebase as soon as the page opens, not when "Enter" is pressed.
+export const warmUp = () => connect().catch(() => {});
+
 // ---------- profiles ----------
 //   homes/cinema-users/<nickname>  { name, lang, key, t }
 // "key" is the SHA-256 of a secret that only the browser that created the profile keeps:
@@ -57,11 +60,11 @@ export async function openRoom(code, me) {
   const inbox = db.child(base, `inbox/${me.id}`);
 
   const info = { name: me.name, handle: me.handle || '', lang: me.lang };
-  const register = async () => {
-    await db.onDisconnect(meRef).remove();
-    await db.onDisconnect(inbox).remove();
-    await db.set(meRef, { ...info, t: db.serverTimestamp() });
-  };
+  const register = () => Promise.all([
+    db.onDisconnect(meRef).remove(),
+    db.onDisconnect(inbox).remove(),
+    db.set(meRef, { ...info, t: db.serverTimestamp() }),
+  ]);
   await register();
   // After a network hiccup Firebase has already removed us (onDisconnect): sign back in.
   let first = true;

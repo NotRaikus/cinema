@@ -1,5 +1,5 @@
 import { TEXT, LANGS } from './i18n.js';
-import { openRoom, lookupHandle, claimHandle, HANDLE } from './signal.js';
+import { openRoom, lookupHandle, claimHandle, HANDLE, warmUp } from './signal.js';
 import { Peer } from './rtc.js';
 
 // Cached: some elements move into the floating window and must still be found.
@@ -138,6 +138,7 @@ $('handle').oninput = () => {
   }, 350);
 };
 applyText();
+warmUp();
 
 async function enter() {
   note('');
@@ -183,10 +184,16 @@ async function join() {
   $('enter').disabled = true;
   $('lobbyNote').textContent = t('joining');
 
-  camStream = await navigator.mediaDevices?.getUserMedia({
+  // Webcam and room registration at the same time: from Thailand every Firebase round trip
+  // to Europe costs a quarter of a second. Connecting to the other person starts only once
+  // both are ready, so the webcam is in the call from the first moment.
+  const camReady = navigator.mediaDevices?.getUserMedia({
     video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
   }).catch(() => navigator.mediaDevices.getUserMedia({ audio: true })).catch(() => null);
+  const roomReady = openRoom(code, me);
+  roomReady.catch(() => {}); // handled below, after the webcam
+  camStream = await camReady;
   if (!camStream) toast(t('noCam'), 6000);
   $('camLocal').srcObject = camStream;
   $('localBox').hidden = !camStream?.getVideoTracks().length;
@@ -194,7 +201,7 @@ async function join() {
   $('btnCam').disabled = !camStream?.getVideoTracks().length;
 
   try {
-    signal = await openRoom(code, me);
+    signal = await roomReady;
   } catch (e) {
     console.error(e);
     $('lobbyNote').textContent = String(e.message || e);
@@ -235,6 +242,7 @@ async function join() {
   window.addEventListener('pagehide', () => { peer?.data({ type: 'bye' }); signal.leave(); });
   showStatus();
   setInterval(updateStats, 3000);
+  setInterval(() => { if (peerId && connState !== 'connected') showStatus(); }, 1000);
 }
 
 // ---------- connection ----------
@@ -268,8 +276,11 @@ function newSession() {
   createPeer();
 }
 
+let connectStart = 0;
+
 function createPeer() {
   const id = peerId, sess = session;
+  connectStart = Date.now();
   peer = new Peer({
     // The film id rides along with every message: the other side always knows which
     // incoming video is the film and which is the webcam.
@@ -352,7 +363,12 @@ function showStatus() {
     if (stats?.relay) text += ` · ${t('relay')}`;
     cls = 'ok';
   } else if (connState === 'disconnected' || connState === 'failed') { text = t('lost'); cls = 'bad'; }
-  else { text = `${t('connecting')} ${peerInfo?.name || ''}`; cls = 'wait'; }
+  else {
+    const secs = connectStart ? Math.round((Date.now() - connectStart) / 1000) : 0;
+    text = `${t('connecting')} ${peerInfo?.name || ''} · ${secs} s`;
+    if (secs >= 20) text += ` · ${t('slowHint')}`;
+    cls = 'wait';
+  }
   if (roomHandle) text = `@${roomHandle} · ${text}`;
   $('statusText').textContent = text;
   el.className = cls;
